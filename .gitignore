@@ -22,3 +22,6 @@ __pycache__/
 
 # Dependency directories
 node_modules/
+
+# Virtual Environment
+.venv/
