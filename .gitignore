@@ -1,0 +1,24 @@
+# Virtual Environment
+venv/
+env/
+.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs and databases
+*.log
+*.db
+
+# Dependency directories
+node_modules/

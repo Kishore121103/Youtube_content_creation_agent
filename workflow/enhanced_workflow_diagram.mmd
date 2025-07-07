@@ -1,0 +1,36 @@
+graph TD
+    subgraph "1. Research & Analysis"
+        A[Start] --> B(Research Agent: Conducts in-depth research on the topic);
+    end
+
+    subgraph "2. Parallel Content Generation"
+        B --> OP(Orchestrate Parallel Generation: Initiates all content generation tasks concurrently);
+        OP --> Y(YoutubeContentAgent: Generates full and brief video scripts);
+        OP --> GI(Content Creator Agent: Generates video introduction);
+        OP --> GA1(Content Creator Agent: Generates Approach 1);
+        OP --> GA2(Content Creator Agent: Generates Approach 2);
+        OP --> GA3(Content Creator Agent: Generates Approach 3);
+        OP --> GA4(Content Creator Agent: Generates Approach 4);
+        OP --> GA5(Content Creator Agent: Generates Approach 5);
+        OP --> T(Title Generator Agent: Creates 5 SEO-friendly titles);
+        OP --> DH(Description & Hashtag Agent: Generates description and hashtags);
+    end
+
+    subgraph "3. Aggregation & Quality Assurance"
+        Y --> AG((Aggregate Content));
+        GI --> AG;
+        GA1 --> AG;
+        GA2 --> AG;
+        GA3 --> AG;
+        GA4 --> AG;
+        GA5 --> AG;
+        T --> AG;
+        DH --> AG;
+        AG --> H{Quality Assurance Agent: Evaluates the complete package};
+    end
+
+    subgraph "4. Refinement Loop & Finalization"
+        H -- "Score < Threshold" --> OP;
+        H -- "Score >= Threshold" --> J(Store in Database);
+        J --> K[End];
+    end
