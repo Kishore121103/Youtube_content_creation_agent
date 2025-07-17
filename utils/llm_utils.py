@@ -10,6 +10,7 @@ import json
 import re
 from openai import OpenAI  # Import OpenAI client for OpenRouter
 
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -59,19 +60,7 @@ class LLMUtils:
                     max_tokens=self.max_tokens
                 )
 
-            elif self.provider.lower() == "openrouter":
-                if not Config.OPENROUTER_API_KEY:
-                    logger.error("OPENROUTER_API_KEY is not set in .env")
-                    raise ValueError("OPENROUTER_API_KEY is not set in .env")
-                logger.debug("Initializing OpenRouter client for DeepSeek")
-                # Initialize OpenAI client with OpenRouter's endpoint
-                client = OpenAI(
-                    api_key=Config.OPENROUTER_API_KEY,
-                    base_url="https://openrouter.ai/api/v1"
-                )
-                return client
-
-            else:
+            
                 logger.error(f"Unsupported LLM provider: {self.provider}")
                 raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
@@ -124,28 +113,55 @@ class LLMUtils:
     def _parse_and_repair_json(self, raw_json_string: str) -> dict:
         """
         Parses a raw string that is expected to be a JSON object.
-        Attempts to repair common LLM output issues like markdown code blocks.
+        Attempts to repair common LLM output issues like markdown code blocks, unescaped quotes, and incomplete JSON.
         """
-        # Remove markdown code block fences if present
         cleaned_string = raw_json_string.strip()
-        if cleaned_string.startswith("```json") and cleaned_string.endswith("```"):
-            cleaned_string = cleaned_string[7:-3].strip()
-        elif cleaned_string.startswith("```") and cleaned_string.endswith("```"):
-            cleaned_string = cleaned_string[3:-3].strip()
 
+        # 1. Attempt to extract JSON from markdown code blocks
+        match_json_block = re.search(r'```json\s*([\s\S]*?)\s*```', cleaned_string)
+        match_generic_block = re.search(r'```\s*([\s\S]*?)\s*```', cleaned_string)
+
+        if match_json_block:
+            json_str = match_json_block.group(1).strip()
+        elif match_generic_block:
+            json_str = match_generic_block.group(1).strip()
+        else:
+            json_str = cleaned_string
+
+        # 2. Attempt to parse directly
         try:
-            return json.loads(cleaned_string)
+            return json.loads(json_str)
         except json.JSONDecodeError as e:
             logger.warning(f"Initial JSON decode failed: {e}. Attempting repair...")
-            # Attempt to find the first and last curly braces to extract the JSON
-            match = re.search(r'\{.*\}', cleaned_string, re.DOTALL)
-            if match:
-                try:
-                    extracted_json_str = match.group(0)
-                    return json.loads(extracted_json_str)
-                except json.JSONDecodeError as e_inner:
-                    logger.error(f"Failed to parse extracted JSON: {e_inner}")
-                    raise ValueError(f"Could not parse or repair JSON: {raw_json_string}") from e_inner
-            else:
-                logger.error("No JSON object found in the string.")
-                raise ValueError(f"No JSON object found in the string: {raw_json_string}") from e
+
+            # 3. Try to repair common issues (e.g., unescaped quotes, trailing commas, comments)
+            # This is a basic attempt; for more complex cases, a dedicated JSON repair library might be needed.
+            repaired_json_str = json_str
+            # Remove trailing commas (simple cases)
+            repaired_json_str = re.sub(r',\s*([}\]])', r'\1', repaired_json_str)
+            # Replace single quotes with double quotes for keys and string values
+            repaired_json_str = re.sub(r"'([a-zA-Z0-9_]+)':", r'"\1":', repaired_json_str) # for keys
+            repaired_json_str = re.sub(r":\s*'(.*?)'", r': "\1"', repaired_json_str) # for values
+            
+            
+            # Escape unescaped double quotes within string values
+            # Escape unescaped double quotes within string values more carefully
+            # This is a complex problem, and a simple regex might not cover all edge cases.
+            # A common issue is when the LLM generates JSON with unescaped quotes inside string values.
+            # We'll try to replace " with \" only if it's not already escaped.
+            # This regex looks for a quote that is not preceded by an odd number of backslashes.
+            temp_str = []
+            i = 0
+            while i < len(repaired_json_str):
+                if repaired_json_str[i] == '\\' and i + 1 < len(repaired_json_str) and repaired_json_str[i+1] == '"':
+                    temp_str.append(repaired_json_str[i]) # Keep the backslash
+                    temp_str.append(repaired_json_str[i+1]) # Keep the escaped quote
+                    i += 2
+                elif repaired_json_str[i] == '"':
+                    temp_str.append('\\') # Add escape character
+                    temp_str.append(repaired_json_str[i]) # Add the quote
+                    i += 1
+                else:
+                    temp_str.append(repaired_json_str[i])
+                    i += 1
+            repaired_json_str = "".join(temp_str)

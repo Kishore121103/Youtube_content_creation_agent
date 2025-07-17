@@ -32,18 +32,22 @@ class ContentGenerationState(TypedDict):
 
 class EnhancedContentWorkflow:
     def __init__(self):
+        logging.info("EnhancedContentWorkflow: Initializing workflow.")
         self.workflow = StateGraph(ContentGenerationState)
         self._build_graph()
         self.app = self.workflow.compile()
         self.db_manager = DatabaseManager()
+        logging.info("EnhancedContentWorkflow: Workflow initialized and compiled.")
 
     def _build_graph(self):
+        logging.info("EnhancedContentWorkflow: Building graph nodes and edges.")
         # 1. Define the nodes (agents)
         self.workflow.add_node("research", self.run_research_agent)
         self.workflow.add_node("orchestrate_parallel_generation", self.orchestrate_parallel_generation_node)
         self.workflow.add_node("aggregate_content", self.run_content_aggregator_agent)
         self.workflow.add_node("quality_assurance", self.run_quality_assurance_agent)
         self.workflow.add_node("store_content", self.store_content_in_db)
+        logging.info("EnhancedContentWorkflow: Nodes added.")
 
         # 2. Define the edges (flow)
         self.workflow.set_entry_point("research")
@@ -59,22 +63,25 @@ class EnhancedContentWorkflow:
             }
         )
         self.workflow.add_edge("store_content", END)
+        logging.info("EnhancedContentWorkflow: Edges defined, including quality assurance loop.")
 
     # --- Agent Execution Methods ---
 
     def run_research_agent(self, state):
-        print("--- Running Research Agent ---")
+        logging.info("--- Running Research Agent ---")
         topic = state['topic']
         agent = ResearchAgent()
         research_data = agent.conduct_research(topic)
+        logging.debug(f"Research Agent: Research data generated: {research_data.keys()}")
         return {"research_data": research_data}
 
     def orchestrate_parallel_generation_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Orchestrate parallel generation of YouTube content, intro, approaches, and metadata."""
-        print("--- Orchestrating Parallel Content Generation ---")
+        logging.info("--- Orchestrating Parallel Content Generation ---")
         topic = state['topic']
         research_data = state['research_data']
         iteration = state.get('iteration', 1)
+        logging.info(f"Orchestrator: Current iteration: {iteration}")
 
         # Initialize agents
         title_agent = TitleGeneratorAgent()
@@ -92,6 +99,7 @@ class EnhancedContentWorkflow:
         }
 
         with ThreadPoolExecutor(max_workers=8) as executor:
+            logging.info("Orchestrator: Submitting parallel content generation tasks.")
             # --- Submit all tasks to the executor ---
             
             # Submit metadata generation tasks
@@ -106,7 +114,7 @@ class EnhancedContentWorkflow:
             }
 
             # --- Retrieve results from futures ---
-
+            logging.info("Orchestrator: Retrieving results from parallel tasks.")
             # Retrieve metadata
             titles = title_future.result()
             desc_hashtags = desc_future.result()
@@ -127,6 +135,7 @@ class EnhancedContentWorkflow:
             youtube_content = youtube_future.result()
 
         # --- Package the results ---
+        logging.info("Orchestrator: Packaging generated content.")
         return {
             "titles": titles,
             "description": desc_hashtags.get('description', ''),
@@ -138,7 +147,7 @@ class EnhancedContentWorkflow:
         }
 
     def run_content_aggregator_agent(self, state):
-        print("--- Running Content Aggregator Agent ---")
+        logging.info("--- Running Content Aggregator Agent ---")
         agent = ContentAggregatorAgent()
         description_data = {
             'description': state['description'],
@@ -158,18 +167,18 @@ class EnhancedContentWorkflow:
             description_data=description_data,
             content_data=content_data
         )
+        logging.debug(f"Content Aggregator Agent: Aggregated content package keys: {content_package.keys()}")
         return {"content_package": content_package}
 
     def run_quality_assurance_agent(self, state):
-        print("--- Running Quality Assurance Agent ---")
+        logging.info("--- Running Quality Assurance Agent ---")
         content_package = state['content_package']
         agent = QualityAssuranceAgent()
         quality_feedback = agent.evaluate_content(content_package)
         
-        scores = quality_feedback.get('quality_score', {})
-        total_score = sum(scores.values())
-        num_scores = len(scores) if scores else 1
-        average_score = total_score / num_scores if num_scores > 0 else 0
+        average_score = quality_feedback.get('overall_score', 0.0)
+        logging.info(f"Quality Assurance Agent: Content evaluated with overall score: {average_score:.2f}")
+        logging.debug(f"Quality Assurance Agent: Quality feedback: {quality_feedback}")
         
         return {"quality_feedback": quality_feedback, "quality_score": average_score}
 
@@ -177,6 +186,7 @@ class EnhancedContentWorkflow:
         """Determine if the content quality is sufficient."""
         iteration = state.get('iteration', 1)
         quality_score = state.get('quality_score', 0)
+        logging.info(f"Quality Decision: Current iteration: {iteration}, Quality Score: {quality_score:.2f}")
         
         if quality_score >= 7.5 or iteration >= 2:
             logging.info(f"Content for '{state['topic']}' approved with score {quality_score:.2f}.")
@@ -187,25 +197,49 @@ class EnhancedContentWorkflow:
             return "refine"
 
     def store_content_in_db(self, state):
-        print("--- Storing Content in Database ---")
-        content_id = self.db_manager.save_content(
-            topic=state['topic'],
-            content_package=state['content_package'],
-            quality_score=state['quality_score'],
-            quality_feedback=state['quality_feedback']
-        )
-        return {"stored": True, "content_id": content_id}
+        logging.info("--- Storing Content in Database ---")
+        content_package = state['content_package']
+        content_data_to_save = {
+            'topic': state['topic'],
+            'titles': content_package.get('titles', []),
+            'description': content_package.get('description', ''),
+            'hashtags': content_package.get('hashtags', []),
+            'content_intro': content_package.get('content_intro', ''),
+            'content_approaches': content_package.get('content_approaches', {}),
+            'quality_score': state.get('quality_score', 0.0),
+            'research_data': state.get('research_data', {}),
+            'youtube_content': content_package.get('youtube_content', {'full_script': '', 'brief_script': ''}),
+            'approved': False, # Default value, can be updated later
+            'approval_status': 'pending' # Default value, can be updated later
+        }
+        content_id = self.db_manager.save_content(content_data_to_save)
+        logging.info(f"Content stored in DB with ID: {content_id}")
+        state['stored'] = True
+        state['content_id'] = content_id
+        return state
 
     def run(self, topic: str):
         """
         Executes the entire content generation workflow.
         """
+        logging.info(f"EnhancedContentWorkflow: Starting run for topic: {topic}")
         initial_state = {"topic": topic, "iteration": 1}
-        final_state = None
+        final_state = initial_state
         for s in self.app.stream(initial_state):
-            final_state = s
+            # LangGraph stream yields updates, so merge them into final_state
+            for key, value in s.items():
+                final_state[key] = value
+            logging.debug(f"EnhancedContentWorkflow: Current state after node execution: {list(s.keys())[0]}")
 
         if final_state:
-            last_node = list(final_state.keys())[-1]
-            return final_state[last_node]
+            logging.info(f"EnhancedContentWorkflow: Workflow finished. Final state: {final_state.keys()}")
+            # Return a comprehensive result for app.py
+            return {
+                "topic": final_state["topic"],
+                "content_package": final_state.get("aggregate_content", {}).get("content_package", {}),
+                "quality_score": final_state.get("quality_score", 0.0),
+                "quality_feedback": final_state.get("quality_feedback", {}),
+                "content_id": final_state.get("content_id", None)
+            }
+        logging.warning("EnhancedContentWorkflow: Workflow finished without a final state.")
         return {}

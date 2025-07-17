@@ -8,19 +8,19 @@ class Config:
     # LLM Configuration
     GROK_API_KEY = os.getenv("GROK_API_KEY")
     GROK_MODEL = os.getenv("GROK_MODEL", "grok-3")
-    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter")
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "google")
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-    MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+    MODEL_NAME = os.getenv("MODEL_NAME", "gemini-1.5-flash") # Using a Google model
     TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 16000))
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     
     # Model names for different tasks
-    FAST_MODEL = os.getenv("FAST_MODEL", "openai/gpt-3.5-turbo")
-    SMART_MODEL = os.getenv("SMART_MODEL", "openai/gpt-4o")
-    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-ai/deepseek-coder") # A good model for code generation
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash") # Default Gemini model
+    FAST_MODEL = os.getenv("FAST_MODEL", "gemini-1.5-flash") # Using a Google model
+    SMART_MODEL = os.getenv("SMART_MODEL", "gemini-1.5-pro") # Using a Google model
+    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL") # A good model for code generation
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash") # Default Gemini model
     
     # Content Generation Settings
     CHANNEL_NAME = "GenKodex"

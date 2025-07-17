@@ -1,13 +1,19 @@
 
+import logging
 from utils.llm_utils import LLMUtils
 from config.settings import Config
 from typing import Dict, Any, List
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class TitleGeneratorAgent:
     def __init__(self):
         self.llm_utils = LLMUtils(provider="openrouter", model_name=Config.DEEPSEEK_MODEL, temperature=0.8)
+        logging.info("TitleGeneratorAgent initialized.")
     
     def generate_titles(self, topic: str, research_data: Dict[str, Any]) -> List[str]:
+        logging.info(f"TitleGeneratorAgent: Generating titles for topic: {topic}")
+        logging.debug(f"TitleGeneratorAgent: Research data for titles: {research_data}")
         """Generate 5 compelling titles for the video"""
         system_prompt = f'''
         You are a YouTube title optimization expert for the tech channel {Config.CHANNEL_NAME}.
@@ -39,6 +45,11 @@ class TitleGeneratorAgent:
         Create 5 engaging titles that would make viewers want to click and learn.
         '''
         
+        logging.debug("TitleGeneratorAgent: Invoking LLM for title generation.")
         raw_content = self.llm_utils.invoke(system_prompt, human_prompt)
+        logging.debug(f"TitleGeneratorAgent: Raw LLM response: {raw_content}")
+        
         result = self.llm_utils._parse_and_repair_json(raw_content)
+        logging.info("TitleGeneratorAgent: Titles generated.")
+        logging.debug(f"TitleGeneratorAgent: Parsed titles: {result.get('titles', [])}")
         return result.get('titles', [])

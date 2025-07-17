@@ -110,7 +110,11 @@ def display_results(result):
 
     # --- Research Data ---
     st.subheader("Research Data")
-    st.json(result['content_package']['research_data'])
+    research_data = result.get('content_package', {}).get('research_data', {})
+    if research_data:
+        st.json(research_data)
+    else:
+        st.warning("No research data available")
 
     # --- Download PDF Button ---
     st.subheader("Download Content")
@@ -139,18 +143,28 @@ def display_results(result):
 def display_content_package(content_pkg):
     with st.expander("**Titles & Metadata**", expanded=True):
         st.markdown("##### Suggested Titles")
-        for title in content_pkg['titles']:
-            st.markdown(f"- {title}")
+        titles = content_pkg.get('titles', [])
+        if titles:
+            for title in titles:
+                st.markdown(f"- {title}")
+        else:
+            st.warning("No titles available")
         
         st.markdown("##### Description")
-        st.text_area("Description", content_pkg['description'], height=150, label_visibility="collapsed")
+        description = content_pkg.get('description', 'No description available')
+        st.text_area("Description", description, height=150, label_visibility="collapsed")
 
         st.markdown("##### Hashtags")
-        st.info(' '.join([f"#{tag}" for tag in content_pkg['hashtags']]))
+        hashtags = content_pkg.get('hashtags', [])
+        if isinstance(hashtags, list) and hashtags:
+            st.info(' '.join([f"#{tag}" for tag in hashtags]))
+        else:
+            st.warning("No hashtags available")
 
     with st.expander("**Video Script**", expanded=True):
         st.markdown("##### Introduction")
-        st.write(content_pkg['content_intro'])
+        content_intro = content_pkg.get('content_intro', 'No introduction available')
+        st.write(content_intro)
 
         with st.expander("**Full Video Script**", expanded=False):
             full_script = content_pkg.get('youtube_content', {}).get('full_script', 'N/A')
@@ -169,16 +183,20 @@ def display_content_package(content_pkg):
             """, unsafe_allow_html=True)
 
         st.markdown("##### Content Approaches")
-        for i, approach in enumerate(content_pkg['content_approaches'].values(), 1):
-            st.markdown(f"**{i}. {approach.get('title', f'Approach {i}')}**")
-            explanation_text = approach.get('explanation')
-            if explanation_text:
-                st.write(explanation_text)
-            else:
-                st.write("No explanation provided.")
-            if approach.get('code_examples'):
-                for code in approach['code_examples']:
-                    st.code(code, language='python')
+        content_approaches = content_pkg.get('content_approaches', {})
+        if content_approaches:
+            for i, approach in enumerate(content_approaches.values(), 1):
+                st.markdown(f"**{i}. {approach.get('title', f'Approach {i}')}**")
+                explanation_text = approach.get('explanation')
+                if explanation_text:
+                    st.write(explanation_text)
+                else:
+                    st.write("No explanation provided.")
+                if approach.get('code_examples'):
+                    for code in approach['code_examples']:
+                        st.code(code, language='python')
+        else:
+            st.warning("No content approaches available")
 
 
 def display_quality_analysis(quality_feedback):

@@ -1,12 +1,18 @@
+import logging
 from utils.llm_utils import LLMUtils
 from config.settings import Config
 import json
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class ContentCreatorAgent:
     def __init__(self):
-        self.llm = LLMUtils(provider="google", model_name=Config.GEMINI_MODEL)
+        self.llm = LLMUtils(provider="openrouter", model_name=Config.DEEPSEEK_MODEL)
+        logging.info("ContentCreatorAgent initialized.")
 
     def create_content_introduction(self, topic, research_data):
+        logging.info(f"ContentCreatorAgent: Generating introduction for topic: {topic}")
+        logging.debug(f"ContentCreatorAgent: Research data for intro: {research_data}")
         """
         Generates a captivating and structured introduction for a YouTube video.
         """
@@ -34,13 +40,17 @@ class ContentCreatorAgent:
         **Generate the introduction script now.**
         """
         system_prompt = "You are a specialized agent for creating engaging YouTube video introductions."
-        return self.llm.invoke(system_prompt, prompt)
+        intro_content = self.llm.invoke(system_prompt, prompt)
+        logging.info("ContentCreatorAgent: Introduction generated.")
+        return intro_content
 
     def generate_single_approach(self, topic, research_data, approach_desc):
+        logging.info(f"ContentCreatorAgent: Generating single approach for topic: {topic}, approach: {approach_desc}")
+        logging.debug(f"ContentCreatorAgent: Research data for approach: {research_data}")
         """
         Generates a single, detailed approach to explain the topic.
         """
-        prompt = f"""
+        base_prompt = f"""
         **Objective:** Develop a single, detailed approach to explain the programming topic: "{topic}". This approach should be tailored to the following pedagogical style: "{approach_desc}". The final output must be a clean, valid JSON object.
 
         **Context & Pedagogy:** The goal is to create a comprehensive educational unit. This approach should be self-contained and provide a complete explanation of the concept from its unique perspective.
@@ -59,33 +69,33 @@ class ContentCreatorAgent:
             *   **Functional:** They must run without errors.
             *   **Relevant:** They must directly demonstrate the point being explained.
             *   **Well-Commented:** The comments should explain the 'why' behind the code, not just the 'what'.
-        3.  **Final Output:** The final output **MUST** be a single, valid JSON object and nothing else. Do not include any text before or after the JSON object.
+        3.  **Final Output:** The final output **MUST** be a single, valid JSON object and nothing else. Do not include any text before or after the JSON object. Ensure all double quotes within string values are properly escaped.
 
         **Generate the JSON object now.**
         """
-        system_prompt = "You are a specialized agent for explaining programming concepts in detail."
-        response_str = self.llm.invoke(system_prompt, prompt)
-        try:
-            # Clean the response to ensure it's a valid JSON string
-            start_index = response_str.find('{')
-            end_index = response_str.rfind('}') + 1
-            if start_index != -1 and end_index != -1:
-                json_str = response_str[start_index:end_index]
-                result = json.loads(json_str)
-                # Check if the result has the expected structure
+        system_prompt = "You are a specialized agent for explaining programming concepts in detail and outputting valid JSON."
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logging.debug(f"ContentCreatorAgent: Attempt {attempt + 1} to generate single approach for {topic} ({approach_desc}).")
+                result = self.llm.invoke(system_prompt, base_prompt, parse_json=True)
                 if isinstance(result, dict) and 'title' in result and 'explanation' in result and 'code_examples' in result:
+                    logging.info(f"ContentCreatorAgent: Successfully parsed and validated approach JSON on attempt {attempt + 1}.")
                     return result
                 else:
-                    return {
-                        "title": "Error in Content Generation",
-                        "explanation": "Failed to generate valid content due to invalid JSON structure.",
-                        "code_examples": []
-                    }
-            else:
-                raise json.JSONDecodeError("No JSON object found in the response.", response_str, 0)
-        except json.JSONDecodeError:
-            return {
-                "title": "Error in Content Generation",
-                "explanation": "Failed to parse JSON response from content generation.",
-                "code_examples": []
-            }
+                    logging.warning(f"ContentCreatorAgent: Invalid JSON structure for approach on attempt {attempt + 1}. Retrying...")
+            except Exception as e:
+                logging.error(f"ContentCreatorAgent: Error during LLM invocation or JSON parsing on attempt {attempt + 1}: {e}. Retrying...")
+            
+            # If it's the last attempt and still failing, add a stronger instruction
+            if attempt == max_retries - 1:
+                logging.warning("ContentCreatorAgent: Last attempt failed. Adding stronger JSON instruction to prompt.")
+                base_prompt += "\n\n**CRITICAL: You MUST return a valid JSON object. Do NOT include any other text or markdown outside the JSON object.**"
+
+        logging.error("ContentCreatorAgent: All retries failed for generating single approach. Returning error structure.")
+        return {
+            "title": "Error in Content Generation",
+            "explanation": "Failed to generate valid content after multiple retries due to invalid JSON structure.",
+            "code_examples": []
+        }

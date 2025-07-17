@@ -1,20 +1,27 @@
 
+import logging
 from utils.llm_utils import LLMUtils
 from config.settings import Config
 from typing import Dict, Any
 import json
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class DescriptionHashtagAgent:
     def __init__(self):
-        self.llm_utils = LLMUtils(provider="google", model_name=Config.GEMINI_MODEL, temperature=0.6)
+        self.llm_utils = LLMUtils(provider="openrouter", model_name=Config.DEEPSEEK_MODEL, temperature=0.6)
+        logging.info("DescriptionHashtagAgent initialized.")
     
     def generate_description_and_hashtags(self, topic: str, research_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate SEO-optimized description and hashtags"""
+        logging.info(f"DescriptionHashtagAgent: Generating description and hashtags for topic: {topic}")
+        logging.debug(f"DescriptionHashtagAgent: Research data for description/hashtags: {research_data}")
         description = self.generate_description(topic, research_data)
         hashtags = self.generate_hashtags(topic, research_data)
+        logging.info("DescriptionHashtagAgent: Description and hashtags generation complete.")
         return {"description": description, "hashtags": hashtags}
 
     def generate_description(self, topic, research_data):
+        logging.info(f"DescriptionHashtagAgent: Generating description for topic: {topic}")
         """
         Generates a concise and SEO-friendly description for the content.
         """
@@ -42,9 +49,12 @@ class DescriptionHashtagAgent:
         **Generate the description now.**
         """
         system_prompt = "You are a specialized agent for generating SEO-optimized content descriptions."
-        return self.llm_utils.invoke(system_prompt, prompt)
+        description_content = self.llm_utils.invoke(system_prompt, prompt)
+        logging.info("DescriptionHashtagAgent: Description generated.")
+        return description_content
 
     def generate_hashtags(self, topic, research_data):
+        logging.info(f"DescriptionHashtagAgent: Generating hashtags for topic: {topic}")
         """
         Generates a list of relevant hashtags for the content.
         """
@@ -86,17 +96,21 @@ class DescriptionHashtagAgent:
         """
         system_prompt = "You are a specialized agent for generating relevant hashtags for content."
         response_str = self.llm_utils.invoke(system_prompt, prompt)
+        logging.debug(f"DescriptionHashtagAgent: Raw LLM response for hashtags: {response_str}")
         try:
             # Clean the response to ensure it's a valid JSON string
             start_index = response_str.find('[')
             end_index = response_str.rfind(']') + 1
             if start_index != -1 and end_index != -1:
                 json_str = response_str[start_index:end_index]
-                return json.loads(json_str)
+                hashtags = json.loads(json_str)
+                logging.info("DescriptionHashtagAgent: Successfully parsed hashtags JSON.")
+                return hashtags
             else:
+                logging.warning("DescriptionHashtagAgent: No JSON array found in the response for hashtags. Attempting fallback.")
                 # Fallback for plain text list
                 return [tag.strip().replace('#', '') for tag in response_str.split()]
         except json.JSONDecodeError as e:
-            print(f"Error decoding JSON for hashtags: {e}")
+            logging.error(f"DescriptionHashtagAgent: JSON decoding error for hashtags: {e}. Attempting fallback.")
             # Fallback for plain text list
             return [tag.strip().replace('#', '') for tag in response_str.split()]

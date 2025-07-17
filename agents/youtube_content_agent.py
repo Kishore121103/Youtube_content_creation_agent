@@ -9,10 +9,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class YouTubeContentAgent:
     def __init__(self):
-        self.llm_utils = LLMUtils(provider="google", model_name=Config.GEMINI_MODEL)
+        self.llm_utils = LLMUtils(provider="openrouter", model_name=Config.DEEPSEEK_MODEL, temperature=0.8)
+        logging.info("YouTubeContentAgent initialized.")
 
     def generate_video_content(self, topic: str, research_data: Dict[str, Any]) -> Dict[str, Any]:
-        logging.info(f"Generating YouTube video content for topic: {topic}")
+        logging.info(f"YouTubeContentAgent: Generating YouTube video content for topic: {topic}")
+        logging.debug(f"YouTubeContentAgent: Research data for video content: {research_data}")
         try:
             system_prompt = "You are a specialized agent for creating engaging and educational YouTube video scripts."
             human_prompt = f"""
@@ -49,57 +51,19 @@ class YouTubeContentAgent:
             **Generate the scripts now.**
             """
             # Explicitly instruct the LLM to return strict JSON format to avoid parsing issues
-            human_prompt += "\n\n**CRITICAL: Return ONLY a valid JSON object with 'full_script' and 'brief_script' keys. Do not include any explanatory text or markdown outside the JSON structure. Ensure the response is parseable as JSON without additional processing.**\n**IMPORTANT: All double quotes within the 'full_script' and 'brief_script' content MUST be escaped (e.g., \" becomes \\\").**"
-            response_str = self.llm_utils.invoke(system_prompt, human_prompt)
-            print("Raw response:", response_str)
-            try:
-                import re
-                # Attempt to extract JSON from response if it's wrapped in markdown code blocks
-                json_match = re.search(r'```json\s*([\s\S]*?)\s*```', response_str)
-                if json_match:
-                    json_string = json_match.group(1)
-                else:
-                    json_match = re.search(r'```\s*([\s\S]*?)\s*```', response_str)
-                    if json_match:
-                        json_string = json_match.group(1)
-                    else:
-                        # If no markdown block, assume the entire response is the JSON string
-                        json_string = response_str.strip()
+            human_prompt += "\n\n**CRITICAL: Return ONLY a valid JSON object with 'full_script' and 'brief_script' keys. Do not include any explanatory text or markdown outside the JSON structure. Ensure the response is parseable as JSON without additional processing.**\n**IMPORTANT: All double quotes within the 'full_script' and 'brief_script' content MUST be escaped (e.g., \" becomes \\\" ).**"
+            logging.debug("YouTubeContentAgent: Invoking LLM for video content generation.")
+            video_content = self.llm_utils.invoke(system_prompt, human_prompt, parse_json=True)
+            logging.debug(f"YouTubeContentAgent: Parsed video content: {video_content}")
 
-                # Pre-process to escape unescaped double quotes within script content
-                # This is a targeted replacement for content within "full_script" and "brief_script" values
-                def escape_quotes_in_scripts(match):
-                    key = match.group(1)
-                    value = match.group(2)
-                    # Escape only unescaped double quotes within the value
-                    escaped_value = re.sub(r'(?<!\\)"', r'\\"', value)
-                    return f'"{key}": "{escaped_value}"'
-
-                # Apply the escaping only to the script content, not the JSON structure itself
-                json_string = re.sub(r'"(full_script|brief_script)":\s*"(.*?)(?<!\\)"', escape_quotes_in_scripts, json_string, flags=re.DOTALL)
-                print("Repaired JSON string for parsing:", json_string[:1000] + "..." if len(json_string) > 1000 else json_string)
-
-                video_content = json.loads(json_string)
-                if not isinstance(video_content, dict) or 'full_script' not in video_content or 'brief_script' not in video_content:
-                    logging.warning("Failed to parse valid JSON for video content. Returning default structure.")
-                    video_content = {
-                        "full_script": "Failed to generate full script due to parsing error.",
-                        "brief_script": "Failed to generate brief script due to parsing error."
-                    }
-            except json.JSONDecodeError as e:
-                logging.error(f"JSON parsing failed: {e}. Repaired JSON string: {json_string[:1000] + '...' if len(json_string) > 1000 else json_string}. Raw response: {response_str[:1000] + '...' if len(response_str) > 1000 else response_str}. Returning default structure.")
+            if not isinstance(video_content, dict) or 'full_script' not in video_content or 'brief_script' not in video_content:
+                logging.warning("YouTubeContentAgent: Failed to parse valid JSON for video content. Returning default structure.")
                 video_content = {
                     "full_script": "Failed to generate full script due to parsing error.",
                     "brief_script": "Failed to generate brief script due to parsing error."
                 }
-            except Exception as e:
-                logging.error(f"An unexpected error occurred during content generation: {e}. Returning default structure.")
-                video_content = {
-                    "full_script": "Error generating full script.",
-                    "brief_script": "Error generating brief script."
-                }
-            logging.info("Successfully generated YouTube video content.")
+            logging.info("YouTubeContentAgent: Successfully generated YouTube video content.")
             return video_content
         except Exception as e:
-            logging.error(f"Error generating YouTube video content: {e}")
+            logging.error(f"YouTubeContentAgent: Error generating YouTube video content: {e}")
             return {"full_script": "Error generating full script.", "brief_script": "Error generating brief script."}
