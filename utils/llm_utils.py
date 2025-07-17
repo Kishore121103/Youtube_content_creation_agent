@@ -148,6 +148,145 @@ class LLMUtils:
             # Escape unescaped double quotes within string values more carefully
             # This is a complex problem, and a simple regex might not cover all edge cases.
             # A common issue is when the LLM generates JSON with unescaped quotes inside string values.
+    def _generate_main_title_section(self, topic: str) -> dict:
+        """Generate main title section for PDF"""
+        return {
+            "type": "heading",
+            "text": f"Educational Content: {topic}",
+            "style": {
+                "font_size": 24,
+                "text_color": "#2E8B57",
+                "alignment": "center",
+                "space_after": 30
+            }
+        }
+
+    def _generate_introduction_section(self, content_intro: str) -> dict:
+        """Generate introduction section for PDF"""
+        return {
+            "type": "section_heading",
+            "text": "Introduction",
+            "style": {
+                "font_size": 18,
+                "text_color": "#36454F",
+                "alignment": "left",
+                "space_after": 10
+            }
+        }
+
+    def _generate_approach_section(self, approach: dict, approach_num: int) -> dict:
+        """Generate approach section for PDF"""
+        content_items = []
+        
+        # Add explanation
+        if approach.get('explanation'):
+            content_items.append({
+                "type": "paragraph",
+                "text": approach['explanation'],
+                "style": {"font_size": 11, "space_after": 10}
+            })
+        
+        # Add code examples
+        if approach.get('code_examples'):
+            content_items.append({
+                "type": "sub_heading",
+                "text": "Code Examples:",
+                "style": {"font_size": 12, "text_color": "#4169E1", "space_after": 5}
+            })
+            for code in approach['code_examples']:
+                content_items.append({
+                    "type": "code_block",
+                    "text": code,
+                    "style": {
+                        "font_size": 9,
+                        "background_color": "#F5F5F5",
+                        "padding": 5,
+                        "space_after": 10
+                    }
+                })
+        
+        return {
+            "type": "approach",
+            "title": approach.get('title', f'Approach {approach_num}'),
+            "content": content_items,
+            "style": {
+                "title_font_size": 14,
+                "title_text_color": "#2E8B57",
+                "box_background_color": "#F8F8FF",
+                "box_border_color": "#D3D3D3",
+                "padding": 15,
+                "space_after": 20
+            }
+        }
+
+    def _generate_research_data_section(self, research_data: dict) -> dict:
+        """Generate research data section for PDF"""
+        content = []
+        content.append({
+            "type": "section_heading",
+            "text": "Research Data",
+            "style": {"font_size": 18, "text_color": "#36454F", "space_after": 15}
+        })
+        
+        key_value_data = []
+        for key, value in research_data.items():
+            if isinstance(value, (str, int, float)):
+                key_value_data.append({
+                    "key": key.replace('_', ' ').title(),
+                    "value": str(value)[:200] + "..." if len(str(value)) > 200 else str(value),
+                    "style": {"font_size": 10, "key_color": "#4169E1", "space_after": 8}
+                })
+        
+        if key_value_data:
+            content.append({
+                "type": "key_value_list",
+                "data": key_value_data
+            })
+        
+        return {"content": content}
+
+    def _generate_metadata_section(self, titles: list, description: str, hashtags: list) -> dict:
+        """Generate metadata section for PDF"""
+        content = []
+        content.append({
+            "type": "section_heading",
+            "text": "Content Metadata",
+            "style": {"font_size": 18, "text_color": "#36454F", "space_after": 15}
+        })
+        
+        # Suggested titles
+        content.append({
+            "type": "list",
+            "heading": "Suggested Titles",
+            "items": titles,
+            "style": {"font_size": 11, "space_after": 15}
+        })
+        
+        # Description
+        content.append({
+            "type": "sub_heading",
+            "text": "Description:",
+            "style": {"font_size": 12, "text_color": "#4169E1", "space_after": 5}
+        })
+        content.append({
+            "type": "paragraph",
+            "text": description,
+            "style": {"font_size": 10, "space_after": 15}
+        })
+        
+        # Hashtags
+        content.append({
+            "type": "sub_heading",
+            "text": "Hashtags:",
+            "style": {"font_size": 12, "text_color": "#4169E1", "space_after": 5}
+        })
+        content.append({
+            "type": "paragraph",
+            "text": " ".join([f"#{tag}" for tag in hashtags]),
+            "style": {"font_size": 10, "space_after": 10}
+        })
+        
+        return {"content": content}
             # We'll try to replace " with \" only if it's not already escaped.
             # This regex looks for a quote that is not preceded by an odd number of backslashes.
             temp_str = []
